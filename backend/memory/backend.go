@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/emersion/go-imap"
-	"github.com/emersion/go-imap/backend"
+	"github.com/littleboss01/go-imap"
+	"github.com/littleboss01/go-imap/backend"
 )
 
 type Backend struct {
