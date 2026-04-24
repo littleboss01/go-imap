@@ -45,29 +45,28 @@ func (c *Client) StartTLS(tlsConfig *tls.Config) error {
 
 	cmd := new(commands.StartTLS)
 
-	err := c.Upgrade(func(conn net.Conn) (net.Conn, error) {
-		// Flag connection as in upgrading
-		c.upgrading = true
-		if status, err := c.execute(cmd, nil); err != nil {
-			return nil, err
-		} else if err := status.Err(); err != nil {
-			return nil, err
-		}
+	err := c.UpgradeWithCommand(
+		func() error {
+			status, err := c.execute(cmd, nil)
+			if err != nil {
+				return err
+			}
+			return status.Err()
+		},
+		func(conn net.Conn) (net.Conn, error) {
+			tlsConn := tls.Client(conn, tlsConfig)
+			if err := tlsConn.Handshake(); err != nil {
+				return nil, err
+			}
 
-		// Wait for reader to block.
-		c.conn.WaitReady()
-		tlsConn := tls.Client(conn, tlsConfig)
-		if err := tlsConn.Handshake(); err != nil {
-			return nil, err
-		}
+			// Capabilities change when TLS is enabled
+			c.locker.Lock()
+			c.caps = nil
+			c.locker.Unlock()
 
-		// Capabilities change when TLS is enabled
-		c.locker.Lock()
-		c.caps = nil
-		c.locker.Unlock()
-
-		return tlsConn, nil
-	})
+			return tlsConn, nil
+		},
+	)
 	if err != nil {
 		return err
 	}

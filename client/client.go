@@ -534,6 +534,30 @@ func (c *Client) Upgrade(upgrader imap.ConnUpgrader) error {
 	return c.conn.Upgrade(upgrader)
 }
 
+// UpgradeWithCommand upgrades the connection after running an upgrade command
+// and synchronizing with the reader goroutine.
+//
+// This function should not be called directly, it must only be used by
+// libraries implementing extensions of the IMAP protocol.
+func (c *Client) UpgradeWithCommand(
+	doUpgradeCommand func() error,
+	wrapConn func(net.Conn) (net.Conn, error),
+) error {
+	c.upgrading = true
+	defer func() {
+		c.upgrading = false
+	}()
+
+	return c.Upgrade(func(conn net.Conn) (net.Conn, error) {
+		if err := doUpgradeCommand(); err != nil {
+			return nil, err
+		}
+
+		c.conn.WaitReady()
+		return wrapConn(conn)
+	})
+}
+
 // Writer returns the imap.Writer for this client's connection.
 //
 // This function should not be called directly, it must only be used by
